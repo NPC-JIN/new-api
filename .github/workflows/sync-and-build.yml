@@ -33,9 +33,10 @@ jobs:
 
       - name: Set custom version
         run: |
-          LATEST_TAG=$(git describe --tags --abbrev=0 || echo "main")
+          LATEST_TAG=$(curl -fsSL https://api.github.com/repos/QuantumNous/new-api/releases/latest | jq -r .tag_name)
           echo "${LATEST_TAG}-smtpfix" > VERSION
           cat VERSION
+
 
       - name: Set lowercase owner
         run: echo "OWNER_LC=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_ENV
