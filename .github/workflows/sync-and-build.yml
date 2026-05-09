@@ -27,9 +27,15 @@ jobs:
       - name: Sync upstream
         run: |
           git remote add upstream https://github.com/QuantumNous/new-api.git
-          git fetch upstream main
+          git fetch upstream main --tags
           git merge upstream/main --no-edit
           git push origin main
+
+      - name: Set custom version
+        run: |
+          LATEST_TAG=$(git describe --tags --abbrev=0 || echo "main")
+          echo "${LATEST_TAG}-smtpfix" > VERSION
+          cat VERSION
 
       - name: Set lowercase owner
         run: echo "OWNER_LC=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_ENV
