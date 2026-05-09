@@ -47,13 +47,15 @@ func SendEmail(subject string, receiver string, content string) error {
 	}
 	encodedSubject := fmt.Sprintf("=?UTF-8?B?%s?=", base64.StdEncoding.EncodeToString([]byte(subject)))
 	encodedFromName := mime.BEncoding.Encode("UTF-8", SystemName)
+	
 	mail := []byte(fmt.Sprintf("To: %s\r\n"+
 		"From: %s <%s>\r\n"+
 		"Subject: %s\r\n"+
 		"Date: %s\r\n"+
-		"Message-ID: %s\r\n"+ // 添加 Message-ID 头
+		"Message-ID: %s\r\n"+
 		"Content-Type: text/html; charset=UTF-8\r\n\r\n%s\r\n",
-		receiver, encodedFromName, SMTPFrom, encodedSubject, time.Now().Format(time.RFC1123Z), id, content
+		receiver, encodedFromName, SMTPFrom, encodedSubject, time.Now().Format(time.RFC1123Z), id, content))
+
 	auth := getSMTPAuth()
 	addr := fmt.Sprintf("%s:%d", SMTPServer, SMTPPort)
 	to := strings.Split(receiver, ";")
