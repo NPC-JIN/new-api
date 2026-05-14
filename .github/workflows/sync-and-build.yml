@@ -1,4 +1,4 @@
-name: Sync upstream and build image
+name: Build patched image from upstream
 
 on:
   workflow_dispatch:
@@ -6,30 +6,20 @@ on:
     - cron: "0 20 * * *"
 
 permissions:
-  contents: write
+  contents: read
   packages: write
 
 jobs:
-  sync-and-build:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout fork
+      - name: Checkout upstream
         uses: actions/checkout@v4
         with:
+          repository: QuantumNous/new-api
+          ref: main
           fetch-depth: 0
-
-      - name: Configure git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-      - name: Sync upstream
-        run: |
-          git remote add upstream https://github.com/QuantumNous/new-api.git
-          git fetch upstream main --tags
-          git merge upstream/main --no-edit
-          git push origin main
 
       - name: Set custom version
         run: |
@@ -37,6 +27,37 @@ jobs:
           echo "${LATEST_TAG}-smtpfix" > VERSION
           cat VERSION
 
+      - name: Apply SMTP From header fix
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("common/email.go")
+          s = path.read_text()
+
+          if '"mime"' not in s:
+              s = s.replace('\t"fmt"\n\t"net/smtp"', '\t"fmt"\n\t"mime"\n\t"net/smtp"')
+
+          needle = 'encodedSubject := fmt.Sprintf("=?UTF-8?B?%s?=", base64.StdEncoding.EncodeToString([]byte(subject)))\n\tmail := []byte(fmt.Sprintf('
+          replacement = 'encodedSubject := fmt.Sprintf("=?UTF-8?B?%s?=", base64.StdEncoding.EncodeToString([]byte(subject)))\n\tencodedFromName := mime.BEncoding.Encode("UTF-8", SystemName)\n\tmail := []byte(fmt.Sprintf('
+          if needle in s and "encodedFromName :=" not in s:
+              s = s.replace(needle, replacement)
+
+          s = s.replace(
+              "receiver, SystemName, SMTPFrom, encodedSubject,",
+              "receiver, encodedFromName, SMTPFrom, encodedSubject,",
+          )
+
+          if "encodedFromName" not in s:
+              raise SystemExit("SMTP From header patch was not applied")
+
+          if "receiver, SystemName, SMTPFrom, encodedSubject," in s:
+              raise SystemExit("SMTP From header patch is incomplete")
+
+          path.write_text(s)
+          PY
+
+          gofmt -w common/email.go
 
       - name: Set lowercase owner
         run: echo "OWNER_LC=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_ENV
